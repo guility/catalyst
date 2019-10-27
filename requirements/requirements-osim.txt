@@ -1,0 +1,2 @@
+# Still requires basic and rl req-ts
+osim-rl==3.0.11
