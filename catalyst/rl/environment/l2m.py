@@ -11,9 +11,6 @@ except ImportError as msg:
     message = msg+'\n'+'Try execute "pip install -U osim-rl"'
     raise ImportError(message)
 
-from gym.spaces import Box
-from catalyst.rl.utils import extend_space
-
 class L2MEnvWrapper(EnvironmentWrapper):
     def __init__(
             self,
