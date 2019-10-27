@@ -9,8 +9,9 @@ from .environment import EnvironmentWrapper
 try:
     from osim.env import L2M2019Env
 except ImportError as msg:
-    message = msg+'\n'+'Try execute "pip install -U osim-rl"'
+    message = msg + '\n' + 'Try execute "pip install -U osim-rl"'
     raise ImportError(message)
+
 
 class L2MEnvWrapper(EnvironmentWrapper):
     def __init__(
@@ -21,19 +22,19 @@ class L2MEnvWrapper(EnvironmentWrapper):
 
             max_episode_length=2500,
             frame_skip=1,
+            action_fn=None,
 
             reward_scale=1.0,
             randomized_start=False,
             delay_reward=False,
             separate_reward=False,
             smooth=False,
+            observe_time=False,
 
             living_bonus=0.0,
             death_penalty=0.0,
             side_deviation_penalty=0.0,
             side_step_penalty=False,
-            action_fn=None,
-            observe_time=False,
             better_speed=0.0,
             tilt_penalty=0.0,
             rotation_penalty=0.0,
@@ -76,9 +77,6 @@ class L2MEnvWrapper(EnvironmentWrapper):
         self.rotation_penalty = rotation_penalty
         self.height_penalty = height_penalty
 
-        self.episodes = 1
-        self.ep2reload = 10
-
     def _process_action(self, action):
         if self.action_fn == "tanh":
             action_mean = .5
@@ -87,13 +85,11 @@ class L2MEnvWrapper(EnvironmentWrapper):
         else:
             return action
 
-
     def _process_observation(self, observation):
         observation = preprocess_obs(observation)
         if self.observe_time:
             observation = np.concatenate([observation, [(self.time_step / self.max_ep_length - 0.5) * 2.]])
         return observation
-
 
     def reset(self):
         self._last_step_time = time.time()
@@ -119,7 +115,6 @@ class L2MEnvWrapper(EnvironmentWrapper):
             observation = np.concatenate([observation, [-1.0]])
 
         return observation
-
 
     def step(self, action):
         delay_between_steps = time.time() - self._last_step_time
@@ -155,7 +150,6 @@ class L2MEnvWrapper(EnvironmentWrapper):
         info["reward_origin"] = reward_origin
 
         return observation, reward, done, info
-
 
     def shape_reward(self, reward, current_action):
         state_desc = self.env.get_state_desc()
@@ -300,7 +294,7 @@ def get_init_pose(ratio=10):
     return np.array(
         [np.random.randint(-ratio, ratio) / 100,  # forward speed
          np.random.randint(-ratio, ratio) / 100,  # rightward speed
-         np.random.randint(94-ratio, 94+ratio) / 100,  # pelvis height
+         np.random.randint(94 - ratio, 94 + ratio) / 100,  # pelvis height
          np.random.randint(-ratio, ratio) * np.pi / (33 * 180),  # trunk lean
          np.random.randint(-ratio, ratio) * np.pi / (33 * 180),  # [right] hip adduct
          np.random.randint(-ratio, ratio) * np.pi / (33 * 180),  # hip flex
