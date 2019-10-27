@@ -3,6 +3,7 @@ import math
 import numpy as np
 import time
 
+from collections import OrderedDict
 from .environment import EnvironmentWrapper
 
 try:
@@ -21,26 +22,24 @@ class L2MEnvWrapper(EnvironmentWrapper):
             max_episode_length=2500,
             frame_skip=1,
 
-            randomized_start=False,
             reward_scale=1.0,
+            randomized_start=False,
             delay_reward=False,
             separate_reward=False,
+            smooth=False,
 
             living_bonus=0.0,
             death_penalty=0.0,
             side_deviation_penalty=0.0,
-            smooth=False,
             side_step_penalty=False,
             action_fn=None,
             observe_time=False,
             better_speed=0.0,
             tilt_penalty=0.0,
             rotation_penalty=0.0,
-            front_move=0.0,
             crossing_legs_penalty=0.0,
             bending_knees_bonus=0.0,
             height_penalty=0.0,
-            obs_shape=None,
             **params):
 
         self.model = model
@@ -75,7 +74,6 @@ class L2MEnvWrapper(EnvironmentWrapper):
         self.better_speed = better_speed
         self.tilt_penalty = tilt_penalty
         self.rotation_penalty = rotation_penalty
-        self.front_move = front_move
         self.height_penalty = height_penalty
 
         self.episodes = 1
@@ -135,15 +133,17 @@ class L2MEnvWrapper(EnvironmentWrapper):
         for i in range(self.frame_skip):
             self.time_step += 1
             if self.smooth:
-                current_action = self.prev_action + (i + 1) * (self.prev_action - current_action) / self.frame_skip
+                current_action = self.prev_action + (i + 1) * (self.prev_action - new_action) / self.frame_skip
             else:
-                current_action = np.clip(new_action, -1.0, 1.0)
+                current_action = new_action
+
             observation, r, done, info = self.env.step(current_action, obs_as_dict=True, project=True)
+
             if not self.delay_reward:
                 reward_origin += r
                 reward += self.shape_reward(r, current_action)
-            if done or not observation:
-                self.episodes = self.episodes + 1
+            if done:
+                self.episodes += 1
                 break
 
         if self.delay_reward:
@@ -164,24 +164,6 @@ class L2MEnvWrapper(EnvironmentWrapper):
             reward = 0
         if not self.previous_state:
             self.previous_state = self.env.get_state_desc()
-
-        if self.front_move:
-            shape += self.living_bonus
-            body_parts = list(state_desc['body_vel'])
-            v_body_whole = np.mean(
-                [[state_desc['body_vel'][part][0], -state_desc['body_vel'][part][2]] for part in body_parts], axis=0)
-            shape += self.front_move * np.power(np.linalg.norm(v_body_whole), 2.0)
-            # Penalting deviation from previous velocity direction
-            vel_rot_deviation = (state_desc['body_vel_rot']['pelvis'][1]
-                                 - self.previous_state['body_vel_rot']['pelvis'][1]) ** 2
-            if vel_rot_deviation > 0.02:
-                shape -= (2 * self.front_move) ** 3 * vel_rot_deviation
-            shape -= self.height_penalty * (max(0.0, 0.9 - state_desc['body_pos']['pelvis'][1]) +
-                                            max(0.0, 1.5 - state_desc['body_pos']['head'][1]))
-            shape -= np.mean(current_action ** 2)
-            self.previous_state = state_desc
-            reward += self.frame_skip * shape
-            return reward
 
         # death penalty
         if self.time_step * self.frame_skip < self.max_ep_length:
@@ -308,24 +290,26 @@ def flatten_json(y):
 
 
 def preprocess_obs(state_desc):
-    result = list(flatten_json(state_desc).values())
+    d = flatten_json(state_desc)
+    d = OrderedDict(sorted(d.items(), key=lambda t: t[0]))
+    result = list(d.values())
     return result
 
 
-def get_init_pose():
+def get_init_pose(ratio=10):
     return np.array(
-        [np.random.randint(-10, 10) / 100,  # forward speed
-         np.random.randint(-10, 10) / 100,  # rightward speed
-         np.random.randint(80, 100) / 100,  # pelvis height
-         np.random.randint(-3, 3) * np.pi / 180,  # trunk lean
-         np.random.randint(-3, 3) * np.pi / 180,  # [right] hip adduct
-         np.random.randint(-3, 3) * np.pi / 180,  # hip flex
-         np.random.randint(-3, 3) * np.pi / 180,  # knee extend
-         np.random.randint(-3, 3) * np.pi / 180,  # ankle flex
-         np.random.randint(-3, 3) * np.pi / 180,  # [left] hip adduct
-         np.random.randint(-3, 3) * np.pi / 180,  # hip flex
-         np.random.randint(-3, 3) * np.pi / 180,  # knee extend
-         np.random.randint(-3, 3) * np.pi / 180])  # ankle flex
+        [np.random.randint(-ratio, ratio) / 100,  # forward speed
+         np.random.randint(-ratio, ratio) / 100,  # rightward speed
+         np.random.randint(94-ratio, 94+ratio) / 100,  # pelvis height
+         np.random.randint(-ratio, ratio) * np.pi / (33 * 180),  # trunk lean
+         np.random.randint(-ratio, ratio) * np.pi / (33 * 180),  # [right] hip adduct
+         np.random.randint(-ratio, ratio) * np.pi / (33 * 180),  # hip flex
+         np.random.randint(-ratio, ratio) * np.pi / (33 * 180),  # knee extend
+         np.random.randint(-ratio, ratio) * np.pi / (33 * 180),  # ankle flex
+         np.random.randint(-ratio, ratio) * np.pi / (33 * 180),  # [left] hip adduct
+         np.random.randint(-ratio, ratio) * np.pi / (33 * 180),  # hip flex
+         np.random.randint(-ratio, ratio) * np.pi / (33 * 180),  # knee extend
+         np.random.randint(-ratio, ratio) * np.pi / (33 * 180)])  # ankle flex
 
 
 __all__ = ["L2MEnvWrapper"]
