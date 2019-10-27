@@ -23,6 +23,7 @@ class L2MEnvWrapper(EnvironmentWrapper):
             max_episode_length=2500,
             frame_skip=1,
             action_fn=None,
+            integrator_accuracy=1e-3,
 
             reward_scale=1.0,
             randomized_start=False,
@@ -41,13 +42,17 @@ class L2MEnvWrapper(EnvironmentWrapper):
             crossing_legs_penalty=0.0,
             bending_knees_bonus=0.0,
             height_penalty=0.0,
+
+            ep2reload=10,
+            episodes=1,
             **params):
 
         self.model = model
         self.difficulty = difficulty
         self.visualize = visualize
         self.randomized_start = randomized_start
-        self.env = env = L2M2019Env(visualize=visualize)
+        self.integrator_accuracy = integrator_accuracy
+        self.env = env = L2M2019Env(visualize=visualize, integrator_accuracy=self.integrator_accuracy)
         self.env.change_model(model=self.model, difficulty=difficulty)
 
         super().__init__(env=env, **params)
@@ -77,6 +82,9 @@ class L2MEnvWrapper(EnvironmentWrapper):
         self.rotation_penalty = rotation_penalty
         self.height_penalty = height_penalty
 
+        self.ep2reload = ep2reload
+        self.episodes = episodes
+
     def _process_action(self, action):
         if self.action_fn == "tanh":
             action_mean = .5
@@ -97,7 +105,7 @@ class L2MEnvWrapper(EnvironmentWrapper):
 
         if self.episodes % self.ep2reload == 0:
             self.env = L2M2019Env(
-                visualize=self.visualize, integrator_accuracy=1e-3)
+                visualize=self.visualize, integrator_accuracy=self.integrator_accuracy)
             self.env.change_model(
                 model=self.model, difficulty=self.difficulty)
 
