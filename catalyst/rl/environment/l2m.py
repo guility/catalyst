@@ -24,6 +24,7 @@ class L2MEnvWrapper(EnvironmentWrapper):
             frame_skip=1,
             action_fn=None,
             integrator_accuracy=1e-3,
+            discrete=False,
 
             reward_scale=1.0,
             randomized_start=False,
@@ -54,6 +55,7 @@ class L2MEnvWrapper(EnvironmentWrapper):
         self.integrator_accuracy = integrator_accuracy
         self.env = env = L2M2019Env(visualize=visualize, integrator_accuracy=self.integrator_accuracy)
         self.env.change_model(model=self.model, difficulty=difficulty)
+        self.discrete = discrete
 
         super().__init__(env=env, **params)
 
@@ -85,8 +87,14 @@ class L2MEnvWrapper(EnvironmentWrapper):
         self.ep2reload = ep2reload
         self.episodes = episodes
 
+    @property
+    def discrete_actions(self) -> int:
+        return int(self.discrete)
+
     def _process_action(self, action):
-        if self.action_fn == "tanh":
+        if self.discrete:
+            return action
+        elif self.action_fn == "tanh":
             action_mean = .5
             action_std = .5
             return action * action_std + action_mean
@@ -155,7 +163,7 @@ class L2MEnvWrapper(EnvironmentWrapper):
 
         self.prev_action = current_action
         observation = self._process_observation(observation)
-        info["reward_origin"] = reward_origin
+        info["raw_reward"] = reward_origin
 
         return observation, reward, done, info
 
