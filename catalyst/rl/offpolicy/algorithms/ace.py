@@ -18,7 +18,7 @@ class ACE(OffpolicyActorCritic):
         self,
         actors: List[ActorSpec],
         critics: List[CriticSpec],
-        actor_train: str = '',
+        actor_train: str = '',              # train_best, delay_best
         action_noise_std: float = 0.2,
         action_noise_clip: float = 0.5,
     ):
@@ -373,9 +373,9 @@ class ACE(OffpolicyActorCritic):
     def actor_update(self, loss):
         metrics = {}
         minimal_loss_id = int(torch.argmin(torch.Tensor(loss)).item())
-        if self._actor_train == "delay_one":
+        if self._actor_train == "delay_best":
             skip_idx = [minimal_loss_id]
-        elif self._actor_train == 'train_one':
+        elif self._actor_train == 'train_best':
             skip_idx = [i for i in range(len(self.actors)) if i!=minimal_loss_id]
         else:
             skip_idx = []
