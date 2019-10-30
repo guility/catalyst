@@ -1,7 +1,7 @@
 args:
-  logdir: ./logs/rl-gym-ace_trainbest  #  change me
+  logdir: ./logs/rl-gym-td3  #  change me
   expdir: null
-  
+
   vis: 0
   infer: 0  #  change me
   valid: 1  #  change me
@@ -9,8 +9,8 @@ args:
 
 db:
   db: RedisDB
-  port: 12002
-  prefix: rl-gym-ace_trainbest  # TODO: remove
+  port: 12000
+  prefix: rl-gym-td3  # TODO: remove
 
 environment:
   environment: GymEnvWrapper
@@ -18,9 +18,8 @@ environment:
 
   history_len: &history_len 3
 
-  frame_skip: 2
-  reward_scale: 1.0
-
+  #frame_skip: 2
+  #reward_scale: 1.0
 
 agents:
   actor:
@@ -30,7 +29,7 @@ agents:
       observation_net_params:
         _network_type: "linear"
         history_len: *history_len
-        features: [512]  # first hidden would be taken from state_shape
+        features: [128]  # first hidden would be taken from state_shape
         use_bias: false
         normalization: LayerNorm
         activation: ReLU
@@ -51,7 +50,7 @@ agents:
       observation_net_params:
         _network_type: "linear"
         history_len: *history_len
-        features: [512]  # first hidden would be taken from state_shape
+        features: [128]  # first hidden would be taken from state_shape
         use_bias: false
         normalization: LayerNorm
         activation: ReLU
@@ -69,17 +68,22 @@ agents:
     value_head_params:  # hidden representation -> value
       in_features: 128  # out features would be taken from action_shape
 
+#      distribution: categorical
+#      num_atoms: 51
+#      values_range: [-300.0, 300.0]
+
+#      distribution: quantile
+#      num_atoms: 51
+
 algorithm:
-  algorithm: ACE
+  algorithm: TD3
 
   n_step: 1
   gamma: 0.99
   actor_tau: 0.01
   critic_tau: 0.01
 
-  actor_train: train_best
-  num_critics: 3
-  num_actors: 3
+  num_critics: 2
   action_noise_std: 0.1
   action_noise_clip: 0.5
 
@@ -99,19 +103,19 @@ algorithm:
     clip_value: 1.0
 
 trainer:
-  batch_size: 250              # transitions
-  num_workers: 4
-  epoch_len: 250               # batches
+  batch_size: 256              # transitions
+  num_workers: 1
+  epoch_len: 500               # batches
 
   replay_buffer_size: 1000000  # transitions
-  min_num_transitions: 1000    # transitions
+  min_num_transitions: 5000    # transitions
 
   save_period: 100             # epochs
   weights_sync_period: 1       # epochs
   target_update_period: 1      # batches
 
   max_updates_per_sample: 32
-  
+
 sampler:
   weights_sync_period: 1
 

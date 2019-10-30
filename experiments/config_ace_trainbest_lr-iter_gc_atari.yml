@@ -1,5 +1,5 @@
 args:
-  logdir: ./logs/rl-gym-ace_trainbest  #  change me
+  logdir: ./logs/rl-gym-ace_trainbest_lriter_ngc  #  change me
   expdir: null
   
   vis: 0
@@ -9,8 +9,8 @@ args:
 
 db:
   db: RedisDB
-  port: 12002
-  prefix: rl-gym-ace_trainbest  # TODO: remove
+  port: 12003
+  prefix: rl-gym-ace_trainbest_lriter_ngc  # TODO: remove
 
 environment:
   environment: GymEnvWrapper
@@ -94,14 +94,11 @@ algorithm:
     optimizer: Adam
     lr: 0.0003
 
-  actor_grad_clip_params:
-    func: clip_grad_value_
-    clip_value: 1.0
 
 trainer:
-  batch_size: 250              # transitions
+  batch_size: 500              # transitions
   num_workers: 4
-  epoch_len: 250               # batches
+  epoch_len: 125               # batches
 
   replay_buffer_size: 1000000  # transitions
   min_num_transitions: 1000    # transitions
@@ -110,7 +107,7 @@ trainer:
   weights_sync_period: 1       # epochs
   target_update_period: 1      # batches
 
-  max_updates_per_sample: 32
+  max_updates_per_sample: 64
   
 sampler:
   weights_sync_period: 1

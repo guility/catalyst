@@ -1,5 +1,5 @@
 args:
-  logdir: ./logs/rl-gym-ace_trainbest  #  change me
+  logdir: ./logs/rl-gym-ace_trainbest_moresamp  #  change me
   expdir: null
   
   vis: 0
@@ -10,7 +10,7 @@ args:
 db:
   db: RedisDB
   port: 12002
-  prefix: rl-gym-ace_trainbest  # TODO: remove
+  prefix: rl-gym-ace_trainbest_moresamp  # TODO: remove
 
 environment:
   environment: GymEnvWrapper
@@ -110,7 +110,7 @@ trainer:
   weights_sync_period: 1       # epochs
   target_update_period: 1      # batches
 
-  max_updates_per_sample: 32
+  max_updates_per_sample: 64
   
 sampler:
   weights_sync_period: 1
