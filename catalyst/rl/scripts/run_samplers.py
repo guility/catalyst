@@ -119,7 +119,9 @@ def run_sampler(
     )
     seeds = seeds[mode]
 
-    if algorithm_fn in OFFPOLICY_ALGORITHMS.values():
+    if hasattr(agent, 'actors'):
+        weights_sync_mode = "algorithm"
+    elif algorithm_fn in OFFPOLICY_ALGORITHMS.values():
         weights_sync_mode = "critic" if env.discrete_actions else "actor"
     elif algorithm_fn in ONPOLICY_ALGORITHMS.values():
         weights_sync_mode = "actor"

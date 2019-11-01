@@ -280,17 +280,32 @@ class ACE(OffpolicyActorCritic):
 
         return policy_loss, value_loss
 
-    def pack_checkpoint(self, with_optimizer: bool = True):
-        checkpoint = {}
+    def eval(self):
+        for key in self.__dict__:
+            attr = getattr(self, key)
+            if isinstance(attr, torch.nn.Module):
+                attr.eval()
+            elif isinstance(attr, list):
+                for v in attr:
+                    if isinstance(v, torch.nn.Module): v.eval()
+            elif isinstance(attr, dict):
+                for key2 in attr:
+                    if isinstance(attr[key2], torch.nn.Module): attr[key2].eval()
 
-        for key in ["actor", "critic"]:
-            checkpoint[f"{key}_state_dict"] = getattr(self, key).state_dict()
-            if with_optimizer:
-                for key2 in ["optimizer", "scheduler"]:
-                    key2 = f"{key}_{key2}"
-                    value2 = getattr(self, key2, None)
-                    if value2 is not None:
-                        checkpoint[f"{key2}_state_dict"] = value2.state_dict()
+    def to(self, device):
+        for key in self.__dict__:
+            attr = getattr(self, key)
+            if isinstance(attr, torch.nn.Module):
+                attr.to(device)
+            elif isinstance(attr, list):
+                for v in attr:
+                    if isinstance(v, torch.nn.Module): v.to(device)
+            elif isinstance(attr, dict):
+                for key2 in attr:
+                    if isinstance(attr[key2], torch.nn.Module): attr[key2].to(device)
+
+    def pack_checkpoint(self, with_optimizer: bool = True):
+        checkpoint = super().pack_checkpoint(with_optimizer)
 
         key = "critics"
         for i in range(len(self.critics)):
@@ -354,6 +369,9 @@ class ACE(OffpolicyActorCritic):
                     if value_l is not None:
                         value_r = checkpoint[f"{key2}_state_dict"]
                         value_l.load_state_dict(value_r)
+
+    def load_state_dict(self, state_dict):
+        self.unpack_checkpoint(state_dict, with_optimizer=False)
 
     def critic_update(self, loss):
         metrics = {}
@@ -489,3 +507,9 @@ class ACE(OffpolicyActorCritic):
         )
 
         return algorithm
+
+    @classmethod
+    def prepare_for_sampler(
+        cls, env_spec: EnvironmentSpec, config: Dict
+    ) -> "AlgorithmSpec":
+        return cls.prepare_for_trainer(env_spec, config)

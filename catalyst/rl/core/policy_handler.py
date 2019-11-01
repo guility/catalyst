@@ -4,6 +4,7 @@ from gym.spaces import Box, Discrete
 import torch
 
 from .agent import ActorSpec, CriticSpec
+from .algorithm import AlgorithmSpec
 from .environment import EnvironmentSpec
 from catalyst.rl import utils
 
@@ -24,7 +25,7 @@ def _state2device(array: np.ndarray, device):
 
 class PolicyHandler:
     def __init__(
-        self, env: EnvironmentSpec, agent: Union[ActorSpec, CriticSpec], device
+            self, env: EnvironmentSpec, agent: Union[ActorSpec, CriticSpec], device
     ):
         self.action_fn = None
         self.discrete_actions = isinstance(env.action_space, Discrete)
@@ -46,10 +47,19 @@ class PolicyHandler:
                 raise NotImplementedError()
         # PPO, DDPG, SAC, TD3
         else:
-            assert isinstance(agent, ActorSpec)
+            assert isinstance(agent, ActorSpec) or isinstance(agent, AlgorithmSpec)
             action_space: Box = env.action_space
             self.action_clip = action_space.low, action_space.high
-            self.action_fn = self._actor_handler
+            if isinstance(agent, AlgorithmSpec):
+                self.action_fn = self._algorithm_handler
+                self.value_distribution = agent.critic.distribution
+                if self.value_distribution == "categorical":
+                    v_min, v_max = agent.critic.values_range
+                    self.z = torch.linspace(
+                        start=v_min, end=v_max, steps=agent.critic.num_atoms
+                    ).to(device)
+            else:
+                self.action_fn = self._actor_handler
 
     @torch.no_grad()
     def _get_q_values(self, critic: CriticSpec, state: np.ndarray, device):
@@ -67,12 +77,28 @@ class PolicyHandler:
         return q_values.cpu().numpy()
 
     @torch.no_grad()
+    def _get_q_values_stateaction(self, critic: CriticSpec, state: np.ndarray, action: np.ndarray, device):
+        states = _state2device(state, device)
+        action = _state2device(action, device)
+        output = critic(states, action)
+        # We use the last head to perform actions
+        # This is the head corresponding to the largest gamma
+        if self.value_distribution == "categorical":
+            probs = torch.softmax(output[0, -1, :, :], dim=-1)
+            q_values = torch.sum(probs * self.z, dim=-1)
+        elif self.value_distribution == "quantile":
+            q_values = torch.mean(output[0, -1, :, :], dim=-1)
+        else:
+            q_values = output[0, -1, :, 0]
+        return q_values.cpu().numpy()
+
+    @torch.no_grad()
     def _sample_from_actor(
-        self,
-        actor: ActorSpec,
-        state: np.ndarray,
-        device,
-        deterministic: bool = False
+            self,
+            actor: ActorSpec,
+            state: np.ndarray,
+            device,
+            deterministic: bool = False
     ):
         states = _state2device(state, device)
         action = actor(states, deterministic=deterministic)
@@ -85,12 +111,12 @@ class PolicyHandler:
         return action
 
     def _critic_handler(
-        self,
-        agent: CriticSpec,
-        state: np.ndarray,
-        device,
-        deterministic: bool = False,
-        exploration_strategy=None
+            self,
+            agent: CriticSpec,
+            state: np.ndarray,
+            device,
+            deterministic: bool = False,
+            exploration_strategy=None
     ):
         q_values = self._get_q_values(agent, state, device)
         if not deterministic and exploration_strategy is not None:
@@ -100,14 +126,30 @@ class PolicyHandler:
         return action
 
     def _actor_handler(
-        self,
-        agent: ActorSpec,
-        state: np.ndarray,
-        device,
-        deterministic: bool = False,
-        exploration_strategy=None
+            self,
+            agent: ActorSpec,
+            state: np.ndarray,
+            device,
+            deterministic: bool = False,
+            exploration_strategy=None
     ):
         action = self._sample_from_actor(agent, state, device, deterministic)
+        if not deterministic and exploration_strategy is not None:
+            action = exploration_strategy.get_action(action)
+        return action
+
+    def _algorithm_handler(
+            self,
+            agent: AlgorithmSpec,
+            state: np.ndarray,
+            device,
+            deterministic: bool = False,
+            exploration_strategy=None
+    ):
+        actions = [self._sample_from_actor(actor, state, device, deterministic) for actor in agent.actors]
+        q_values = [sum([np.mean(self._get_q_values_stateaction(critic, state, action, device)) for critic in agent.critics])
+                    for action in actions]
+        action = actions[np.argmax(q_values)]
         if not deterministic and exploration_strategy is not None:
             action = exploration_strategy.get_action(action)
         return action

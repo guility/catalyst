@@ -132,7 +132,13 @@ class TrajectorySampler:
                     and len(self.observations) > 1:
                 states = self._get_states_history()
                 states = utils.any2device(states, device=self._device)
-                exploration_strategy.update_actor(self.agent, states)
+                if isinstance(self.agent, ActorSpec):
+                    exploration_strategy.update_actor(self.agent, states)
+                else:
+                    for key in self.agent.__dict__:
+                        attr = getattr(self.agent, key)
+                        if isinstance(attr, ActorSpec):
+                            exploration_strategy.update_actor(attr, states)
 
         observation = self.env.reset()
         self._init_buffers()

@@ -155,7 +155,10 @@ class Sampler:
             raise NotImplementedError("No checkpoint found")
 
         self.checkpoint = checkpoint
-        weights = self.checkpoint[f"{self._weights_sync_mode}_state_dict"]
+        if self._weights_sync_mode=='algorithm':
+            weights = self.checkpoint
+        else:
+            weights = self.checkpoint[f"{self._weights_sync_mode}_state_dict"]
         weights = {
             k: utils.any2device(v, device=self._device)
             for k, v in weights.items()
@@ -373,7 +376,10 @@ class ValidSampler(Sampler):
             return False
 
         self.checkpoint = checkpoint
-        weights = self.checkpoint[f"{self._weights_sync_mode}_state_dict"]
+        if self._weights_sync_mode == 'algorithm':
+            weights = self.checkpoint
+        else:
+            weights = self.checkpoint[f"{self._weights_sync_mode}_state_dict"]
         weights = {
             k: utils.any2device(v, device=self._device)
             for k, v in weights.items()
